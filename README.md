@@ -1,22 +1,22 @@
 # Anthropic Claude API Pipeline for Open WebUI
 
-A clean, secure Anthropic Claude integration for Open WebUI. Built with DHH-inspired principles: simple, expressive, and secure by defaultnot security theater.
+A clean, secure Anthropic Claude integration for Open WebUI. Built with DHH-inspired principles: simple, expressive, and secure by default, not security theater.
 
 This pipeline provides seamless access to all Claude models with essential security features and zero configuration overhead.
 
 ## Features
 
 ### Security (Real Protection, Not Theater)
- **SSRF Protection** - Validates URLs, blocks private networks and metadata endpoints
- **Input Validation** - Prevents crashes from malformed data
- **Secure Error Handling** - User-friendly messages, no information disclosure
- **Image Size Validation** - Enforces Anthropic's 5MB limit per image
+✅ **SSRF Protection** - Validates URLs, blocks private networks and metadata endpoints<br>
+✅ **Input Validation** - Prevents crashes from malformed data<br>
+✅ **Secure Error Handling** - User-friendly messages, no information disclosure<br>
+✅ **Image Size Validation** - Enforces Anthropic's 5MB limit per image<br>
 
 ### Core Functionality
- **Streaming Support** - Real-time response streaming
- **Multimodal** - Text and image processing
- **Retry Logic** - Automatic retry with exponential backoff
- **All Claude Models** - Full model family support
+✅ **Streaming Support** - Real-time response streaming<br>
+✅ **Multimodal** - Text and image processing<br>
+✅ **Retry Logic** - Automatic retry with exponential backoff<br>
+✅ **All Claude Models** - Full model family support<br>
 
 ## Supported Models
 
