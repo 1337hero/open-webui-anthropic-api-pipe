@@ -13,29 +13,33 @@ This pipeline provides seamless access to all Claude models with essential secur
 ✅ **Image Size Validation** - Enforces Anthropic's 5MB limit per image<br>
 
 ### Core Functionality
+✅ **Dynamic Model List** - Auto-fetches available models from Anthropic's API<br>
+✅ **Auto-Refresh** - Configurable refresh interval (default: 1 hour)<br>
 ✅ **Streaming Support** - Real-time response streaming<br>
 ✅ **Multimodal** - Text and image processing<br>
 ✅ **Retry Logic** - Automatic retry with exponential backoff<br>
-✅ **All Claude Models** - Full model family support<br>
+✅ **Graceful Fallback** - Uses cached/fallback models if API is unavailable<br>
 
 ## Supported Models
 
-### Claude 4 Family (Latest)
-- **claude-sonnet-4-5-20250929** - Best balance of intelligence, speed, and cost
-- **claude-haiku-4-5-20251001** - Fastest responses with near-frontier intelligence
-- **claude-opus-4-1-20250805** - Specialized reasoning for complex tasks
+The pipeline **automatically fetches** the latest available models from Anthropic's `/v1/models` API. New models are picked up automatically when Anthropic releases them.
 
-### Claude 3.7
-- **claude-3-7-sonnet-20250219** - Enhanced capabilities with extended thinking
+Models are refreshed hourly by default (configurable via `MODEL_REFRESH_INTERVAL`).
 
-### Claude 3.5 Family
-- **claude-3-5-sonnet-20241022** - Strong general-purpose model
-- **claude-3-5-haiku-20241022** - Fast and cost-effective
+### Fallback Models
+If the API is unavailable, these models are used as fallback:
 
-### Claude 3 Family
-- **claude-3-opus-20240229** - Previous generation flagship
-- **claude-3-sonnet-20240229** - Balanced performance
-- **claude-3-haiku-20240307** - Speed-optimized
+| Model ID | Description |
+|----------|-------------|
+| `claude-sonnet-4-5-20250929` | Best balance of intelligence, speed, and cost |
+| `claude-haiku-4-5-20251001` | Fastest responses with near-frontier intelligence |
+| `claude-opus-4-1-20250805` | Specialized reasoning for complex tasks |
+| `claude-3-7-sonnet-20250219` | Enhanced capabilities with extended thinking |
+| `claude-3-5-sonnet-20241022` | Strong general-purpose model |
+| `claude-3-5-haiku-20241022` | Fast and cost-effective |
+| `claude-3-opus-20240229` | Previous generation flagship |
+| `claude-3-sonnet-20240229` | Balanced performance |
+| `claude-3-haiku-20240307` | Speed-optimized |
 
 ## Installation
 
@@ -64,11 +68,12 @@ The pipeline has exactly **one** configuration option:
 5. Save
 
 
-| Setting | Description | Required |
-|---------|-------------|----------|
-| `ANTHROPIC_API_KEY` | Your Anthropic API key | Yes |
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `ANTHROPIC_API_KEY` | Your Anthropic API key | (required) |
+| `MODEL_REFRESH_INTERVAL` | Seconds between model list refreshes (0 to disable) | `3600` |
 
-That's it. No unnecessary knobs, no feature flags, no complexity.
+Minimal config, maximum functionality.
 
 ## Security Model
 
@@ -99,8 +104,10 @@ Detailed errors are logged server-side for debugging.
 
 ### Models not showing up
 1. Verify the pipeline is imported correctly
-2. Check Open WebUI logs for import errors
-3. Restart Open WebUI if needed
+2. Check that your API key is configured (required for fetching models)
+3. Check Open WebUI logs for API errors
+4. If API is unavailable, fallback models should still appear
+5. Restart Open WebUI if needed
 
 ### API key errors
 1. Ensure your API key starts with `sk-ant-`
@@ -122,7 +129,7 @@ Detailed errors are logged server-side for debugging.
 This pipeline follows DHH's principles:
 
 **Simple > Clever**
-- ~340 lines of clean, readable code
+- ~400 lines of clean, readable code
 - No unnecessary abstractions
 - Clear intent over technical wizardry
 
@@ -132,7 +139,7 @@ This pipeline follows DHH's principles:
 - HTTPS-only, safe error handling
 
 **Convention over Configuration**
-- One configuration option (API key)
+- Two configuration options (API key + refresh interval)
 - Sensible defaults that work
 - No feature flags for security
 

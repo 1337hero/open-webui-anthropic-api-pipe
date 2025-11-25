@@ -1,7 +1,7 @@
 """
 title: Anthropic Claude API
 author: 1337Hero (Mike Key)
-version: 2.0.0
+version: 2.1.0
 license: MIT
 required_open_webui_version: 0.5.0
 requirements: requests>=2.31.0
@@ -9,14 +9,23 @@ requirements: requests>=2.31.0
 A clean, simple Anthropic Claude integration that does exactly what's needed.
 Security by default, not security theater.
 
+Features:
+- Dynamic model list: Fetches available models from Anthropic's /v1/models API
+- Auto-refresh: Configurable refresh interval (default: 1 hour)
+- Graceful fallback: Uses cached/fallback models if API is unavailable
+
 Environment Variables:
 - ANTHROPIC_API_KEY (required): Your Anthropic API key
+
+Configuration:
+- MODEL_REFRESH_INTERVAL: Seconds between model list refreshes (default: 3600, 0 to disable)
 """
 
 import os
 import json
 import logging
-from typing import Generator, Union, Dict, Any, List
+import time
+from typing import Generator, Union, Dict, Any, List, Optional
 from urllib.parse import urlparse
 from ipaddress import ip_address, ip_network
 
@@ -45,6 +54,23 @@ class Pipe:
             default="",
             description="Your Anthropic API key"
         )
+        MODEL_REFRESH_INTERVAL: int = Field(
+            default=3600,
+            description="How often to refresh model list from API (seconds). Set to 0 to disable auto-refresh."
+        )
+
+    # Fallback models when API is unavailable
+    FALLBACK_MODELS = [
+        {"id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5"},
+        {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5"},
+        {"id": "claude-opus-4-1-20250805", "name": "Claude Opus 4.1"},
+        {"id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet"},
+        {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet"},
+        {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku"},
+        {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus"},
+        {"id": "claude-3-sonnet-20240229", "name": "Claude 3 Sonnet"},
+        {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku"},
+    ]
 
     def __init__(self):
         self.name = "Anthropic Claude"
@@ -54,23 +80,86 @@ class Pipe:
         self.timeout = 60
         self.logger = logging.getLogger(__name__)
 
+        # Model cache
+        self._cached_models: Optional[List[Dict[str, str]]] = None
+        self._cache_timestamp: float = 0
+
     def pipes(self) -> List[Dict[str, str]]:
-        """Return available Claude models."""
-        return [
-            # Latest Claude 4 family
-            {"id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5"},
-            {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5"},
-            {"id": "claude-opus-4-1-20250805", "name": "Claude Opus 4.1"},
-            # Claude 3.7
-            {"id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet"},
-            # Claude 3.5
-            {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet"},
-            {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku"},
-            # Claude 3
-            {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus"},
-            {"id": "claude-3-sonnet-20240229", "name": "Claude 3 Sonnet"},
-            {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku"},
-        ]
+        """Return available Claude models, fetched dynamically from Anthropic API."""
+        # Check if cache is valid
+        if self._is_cache_valid():
+            return self._cached_models
+
+        # Try to fetch fresh models
+        models = self._fetch_models_from_api()
+
+        if models:
+            self._cached_models = models
+            self._cache_timestamp = time.time()
+            return models
+
+        # Return cached models if available, otherwise fallback
+        if self._cached_models:
+            self.logger.warning("Using stale cached models (API unavailable)")
+            return self._cached_models
+
+        self.logger.warning("Using fallback models (API unavailable)")
+        return self.FALLBACK_MODELS
+
+    def _is_cache_valid(self) -> bool:
+        """Check if the model cache is still valid."""
+        if not self._cached_models:
+            return False
+
+        refresh_interval = self.valves.MODEL_REFRESH_INTERVAL
+        if refresh_interval <= 0:
+            # Auto-refresh disabled, cache never expires
+            return True
+
+        age = time.time() - self._cache_timestamp
+        return age < refresh_interval
+
+    def _fetch_models_from_api(self) -> Optional[List[Dict[str, str]]]:
+        """Fetch available models from Anthropic's API."""
+        if not self.valves.ANTHROPIC_API_KEY:
+            return None
+
+        try:
+            response = requests.get(
+                "https://api.anthropic.com/v1/models",
+                headers={
+                    "x-api-key": self.valves.ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                },
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            models = []
+            for model in data.get("data", []):
+                model_id = model.get("id", "")
+                display_name = model.get("display_name", model_id)
+
+                # Skip non-Claude models if any
+                if not model_id.startswith("claude"):
+                    continue
+
+                models.append({
+                    "id": model_id,
+                    "name": display_name
+                })
+
+            if models:
+                self.logger.info(f"Fetched {len(models)} models from Anthropic API")
+                return models
+
+        except requests.exceptions.RequestException as e:
+            self.logger.warning(f"Failed to fetch models from API: {e}")
+        except (KeyError, ValueError) as e:
+            self.logger.warning(f"Failed to parse models response: {e}")
+
+        return None
 
     def pipe(self, body: Dict[str, Any]) -> Union[str, Generator[str, None, None]]:
         """Process request and return Claude's response."""
